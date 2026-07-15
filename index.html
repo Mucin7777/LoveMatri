@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>出庫入庫管理</title>
+<style>
+  :root{
+    --bg:#F5F6F2; --ink:#22302C; --sub:#6B7570; --line:#E1E4DD; --card:#FFFFFF;
+    --base:#2E6E5A; --base-soft:#E3EFE9;
+    --prep:#B9772E; --prep-soft:#F7ECDD;
+    --danger:#B4443C; --danger-soft:#F6E3E1;
+    --blue:#3A5F8A; --blue-soft:#E4EBF3;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Hiragino Sans","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+    font-size:14px; padding-bottom:80px;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:0 16px;}
+  header{padding-top:24px;}
+  .titlebar{display:flex; align-items:baseline; justify-content:space-between; gap:8px; flex-wrap:wrap;}
+  h1{font-size:20px; letter-spacing:.05em;}
+  #connState{font-size:11px; color:var(--sub); display:flex; align-items:center; gap:4px;}
+  .dot{width:8px; height:8px; border-radius:99px; background:#C4CBC6; display:inline-block;}
+  .dot.live{background:var(--base);}
+  .dot.err{background:var(--danger);}
+
+  /* stock cards */
+  .stocks{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;}
+  @media(max-width:520px){ .stocks{grid-template-columns:1fr;} }
+  .stock{
+    background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 20px;
+    border-top:4px solid var(--base);
+  }
+  .stock.prep{border-top-color:var(--prep);}
+  .stock .slabel{font-size:12px; font-weight:600; color:var(--sub);}
+  .stock .snum{font-size:40px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.2;}
+  .stock .snum.zero{color:var(--danger);}
+  .stock .sunit{font-size:13px; color:var(--sub); margin-left:4px;}
+
+  /* operator */
+  .opbar{
+    margin-top:14px; background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:12px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+  .opbar .lbl{font-size:12px; font-weight:600; color:var(--sub); white-space:nowrap;}
+  .opbar select{flex:1; min-width:140px;}
+  .opbar .warn{font-size:11px; color:var(--danger); width:100%;}
+
+  input, select, textarea{
+    padding:8px 10px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; color:var(--ink); font-size:14px; font-family:inherit; outline:none;
+  }
+  input:focus, select:focus, textarea:focus{border-color:var(--sub);}
+
+  /* actions */
+  .actions{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-top:14px;}
+  .abtn{
+    border:none; border-radius:12px; padding:14px 10px; cursor:pointer;
+    font-size:14px; font-weight:700; color:#fff; line-height:1.5;
+  }
+  .abtn small{display:block; font-size:11px; font-weight:400; opacity:.9;}
+  .abtn.in{background:var(--base);}
+  .abtn.split{background:var(--prep);}
+  .abtn.out{background:var(--blue);}
+  .abtn.adjust{background:var(--card); color:var(--ink); border:1px solid var(--line); font-weight:600;}
+  .abtn:disabled{opacity:.4; cursor:default;}
+
+  /* history */
+  h2{font-size:15px; margin-top:28px; display:flex; justify-content:space-between; align-items:baseline;}
+  h2 .minibtn{font-weight:400;}
+  .hist{margin-top:10px; display:flex; flex-direction:column; gap:8px;}
+  .hrow{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:10px 14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+  .hbadge{font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap;}
+  .hb-in{background:var(--base-soft); color:var(--base);}
+  .hb-split{background:var(--prep-soft); color:var(--prep);}
+  .hb-out{background:var(--blue-soft); color:var(--blue);}
+  .hb-adjust{background:#EEF0EC; color:var(--sub);}
+  .hwho{font-weight:600;}
+  .hdelta{font-size:12px; color:var(--sub);}
+  .hdelta b{color:var(--ink); font-variant-numeric:tabular-nums;}
+  .htime{font-size:11px; color:var(--sub); margin-left:auto; white-space:nowrap;}
+  .hnote{font-size:11px; color:var(--sub); width:100%;}
+  .empty{text-align:center; padding:40px 0; color:var(--sub); font-size:13px;}
+
+  .minibtn{
+    font-size:12px; padding:6px 12px; border-radius:8px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--ink);
+  }
+
+  /* modal */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.35); z-index:50;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  @media(min-width:640px){ .overlay{align-items:center; padding:16px;} }
+  .modal{
+    background:var(--card); width:100%; max-width:420px; max-height:90vh; overflow-y:auto;
+    border-radius:16px 16px 0 0; padding:20px;
+  }
+  @media(min-width:640px){ .modal{border-radius:16px;} }
+  .modalhead{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;}
+  .modalhead h3{font-size:16px;}
+  .xbtn{background:none; border:none; font-size:20px; color:var(--sub); cursor:pointer; padding:0 8px;}
+  .field{margin-bottom:12px;}
+  .field .flabel{font-size:11px; font-weight:600; color:var(--sub); display:block; margin-bottom:4px;}
+  .field input, .field textarea, .field select{width:100%;}
+  .preview{
+    background:var(--bg); border-radius:10px; padding:12px; font-size:13px; line-height:1.8; margin-bottom:12px;
+  }
+  .preview b{font-variant-numeric:tabular-nums;}
+  .modalfoot{display:flex; justify-content:flex-end; gap:8px; margin-top:16px;}
+  .btn{
+    padding:9px 18px; border-radius:8px; border:none; cursor:pointer;
+    font-size:14px; font-weight:600; color:#fff;
+  }
+  .btn.ghost{background:var(--card); color:var(--ink); border:1px solid var(--line); font-weight:400;}
+  .btn.c-in{background:var(--base);} .btn.c-split{background:var(--prep);}
+  .btn.c-out{background:var(--blue);} .btn.c-adjust{background:var(--ink);}
+  .btn.danger{background:var(--danger);}
+  .btn:disabled{opacity:.4; cursor:default;}
+
+  .memrow{display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--line);}
+  .memrow button{font-size:11px; color:var(--danger); background:none; border:1px solid var(--line); border-radius:8px; padding:4px 10px; cursor:pointer;}
+  .addmem{display:flex; gap:8px; margin-top:12px;}
+  .addmem input{flex:1;}
+
+  /* setup screen */
+  .setup{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:24px; margin-top:24px; line-height:1.9; font-size:13px;
+  }
+  .setup h2{margin-top:0;}
+  .setup code{background:var(--bg); padding:2px 6px; border-radius:6px; font-size:12px;}
+  .setup ol{padding-left:20px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="titlebar">
+      <h1>出庫入庫管理</h1>
+      <span id="connState"><span class="dot"></span>接続中…</span>
+    </div>
+  </header>
+  <div id="app"></div>
+</div>
+<div id="modalRoot"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+"use strict";
+
+// ============================================================
+// ★ 設定：Supabaseの「Project URL」と「anon public キー」を
+//   下の2行に貼り付けてください（手順書参照）
+// ============================================================
+const SUPABASE_URL      = "https://hmhiglayyilleuyepftp.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_mrJvZBUNSrUgV09rXfkQdQ_wRIZkdBy";
+
+// 小分けの比率（瓶1本 → 調製品10本）
+const SPLIT_RATIO = 10;
+const VIAL_LABEL = "瓶（原液 10mL）";
+const PREP_LABEL = "調製品（小分け）";
+
+// ============================================================
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const ACTIONS = {
+  "瓶入庫":   { cls:"in",     btn:"c-in" },
+  "小分け":   { cls:"split",  btn:"c-split" },
+  "調製品出庫":{ cls:"out",    btn:"c-out" },
+  "棚卸修正": { cls:"adjust", btn:"c-adjust" },
+};
+
+let sb = null;
+let members = [];
+let txs = [];          // 全履歴（新しい順）
+let vialCount = 0, prepCount = 0;
+let currentOp = localStorage.getItem("op-name") || "";
+let pollTimer = null;
+
+function configured(){
+  return SUPABASE_URL.startsWith("https://") && !SUPABASE_ANON_KEY.includes("貼り付け");
+}
+
+// ---------- 初期化 ----------
+async function init(){
+  if(!configured()){
+    $("app").innerHTML = setupHTML();
+    setConn("err", "未設定");
+    return;
+  }
+  sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  await refresh();
+  // リアルタイム購読
+  sb.channel("changes")
+    .on("postgres_changes", { event:"*", schema:"public", table:"transactions" }, () => refresh())
+    .on("postgres_changes", { event:"*", schema:"public", table:"members" }, () => refresh())
+    .subscribe((status) => {
+      if(status === "SUBSCRIBED") setConn("live", "リアルタイム接続中");
+    });
+  // 保険として30秒ごとに再取得
+  pollTimer = setInterval(refresh, 30000);
+}
+
+async function refresh(){
+  try{
+    const [mRes, tRes] = await Promise.all([
+      sb.from("members").select("*").order("created_at"),
+      sb.from("transactions").select("*").order("created_at", { ascending:false }),
+    ]);
+    if(mRes.error) throw mRes.error;
+    if(tRes.error) throw tRes.error;
+    members = mRes.data;
+    txs = tRes.data;
+    vialCount = txs.reduce((s,t) => s + (t.vial_delta||0), 0);
+    prepCount = txs.reduce((s,t) => s + (t.aliquot_delta||0), 0);
+    render();
+  }catch(e){
+    console.error(e);
+    setConn("err", "接続エラー：設定とネットワークを確認してください");
+  }
+}
+
+function setConn(cls, text){
+  $("connState").innerHTML = '<span class="dot ' + cls + '"></span>' + esc(text);
+}
+
+// ---------- 画面 ----------
+function render(){
+  const opOk = currentOp && members.some(m => m.name === currentOp);
+  let h = "";
+
+  // 在庫カード
+  h += '<div class="stocks">'
+    + '<div class="stock"><div class="slabel">' + VIAL_LABEL + '</div>'
+    + '<div><span class="snum' + (vialCount<=0?" zero":"") + '">' + vialCount + '</span><span class="sunit">本</span></div></div>'
+    + '<div class="stock prep"><div class="slabel">' + PREP_LABEL + '</div>'
+    + '<div><span class="snum' + (prepCount<=0?" zero":"") + '">' + prepCount + '</span><span class="sunit">本</span></div></div>'
+    + '</div>';
+
+  // 操作者
+  let opts = '<option value="">（選択してください）</option>';
+  members.forEach(m => { opts += '<option value="' + esc(m.name) + '"' + (m.name === currentOp ? " selected" : "") + ">" + esc(m.name) + "</option>"; });
+  h += '<div class="opbar"><span class="lbl">👤 操作する人</span>'
+    + '<select onchange="App.setOp(this.value)">' + opts + '</select>'
+    + '<button class="minibtn" onclick="App.openMembers()">メンバー管理</button>'
+    + (!opOk ? '<span class="warn">※操作の前に、操作する人を選んでください（記録に残ります）</span>' : "")
+    + '</div>';
+
+  // 操作ボタン
+  h += '<div class="actions">'
+    + '<button class="abtn in" ' + (opOk?"":"disabled") + ' onclick="App.openOp(\'瓶入庫\')">瓶を入庫<small>＋N本</small></button>'
+    + '<button class="abtn split" ' + (opOk && vialCount>0 ? "" : "disabled") + ' onclick="App.openOp(\'小分け\')">小分けする<small>瓶−1 → 調製品＋' + SPLIT_RATIO + '</small></button>'
+    + '<button class="abtn out" ' + (opOk && prepCount>0 ? "" : "disabled") + ' onclick="App.openOp(\'調製品出庫\')">調製品を出庫<small>−N本</small></button>'
+    + '<button class="abtn adjust" ' + (opOk?"":"disabled") + ' onclick="App.openOp(\'棚卸修正\')">数を修正<small>棚卸し・訂正</small></button>'
+    + '</div>';
+
+  // 履歴
+  h += '<h2>履歴（全' + txs.length + '件）<button class="minibtn" onclick="App.exportCSV()">📊 CSVで書き出し</button></h2>';
+  if(txs.length === 0){
+    h += '<div class="empty">まだ記録がありません。「瓶を入庫」から始めてください。</div>';
+  }else{
+    h += '<div class="hist">' + txs.slice(0, 100).map(histRow).join("") + "</div>";
+    if(txs.length > 100) h += '<div class="empty" style="padding:16px 0;">直近100件を表示中（全データはCSVで確認できます）</div>';
+  }
+  $("app").innerHTML = h;
+}
+
+function histRow(t){
+  const a = ACTIONS[t.action] || { cls:"adjust" };
+  let delta = "";
+  if(t.vial_delta) delta += "瓶 <b>" + (t.vial_delta>0?"＋":"") + t.vial_delta + "</b>本　";
+  if(t.aliquot_delta) delta += "調製品 <b>" + (t.aliquot_delta>0?"＋":"") + t.aliquot_delta + "</b>本";
+  const d = new Date(t.created_at);
+  const time = d.toLocaleString("ja-JP", { month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit" });
+  return '<div class="hrow">'
+    + '<span class="hbadge hb-' + a.cls + '">' + esc(t.action) + '</span>'
+    + '<span class="hwho">' + esc(t.member_name) + '</span>'
+    + '<span class="hdelta">' + delta + '</span>'
+    + '<span class="htime">' + time + '</span>'
+    + (t.note ? '<span class="hnote">📝 ' + esc(t.note) + "</span>" : "")
+    + "</div>";
+}
+
+// ---------- 操作モーダル ----------
+function opModalHTML(action){
+  const a = ACTIONS[action];
+  let body = "";
+  if(action === "瓶入庫"){
+    body = qtyField("入庫する瓶の本数", 1)
+      + '<div class="preview" id="preview"></div>';
+  }else if(action === "小分け"){
+    body = qtyField("小分けする瓶の本数", 1, vialCount)
+      + '<div class="preview" id="preview"></div>';
+  }else if(action === "調製品出庫"){
+    body = qtyField("出庫する調製品の本数", 1, prepCount)
+      + '<div class="preview" id="preview"></div>';
+  }else{ // 棚卸修正
+    body = '<div class="field"><span class="flabel">瓶の正しい本数</span><input type="number" id="q_vial" min="0" step="1" value="' + vialCount + '" oninput="App.updatePreview()"></div>'
+      + '<div class="field"><span class="flabel">調製品の正しい本数</span><input type="number" id="q_prep" min="0" step="1" value="' + prepCount + '" oninput="App.updatePreview()"></div>'
+      + '<div class="preview" id="preview"></div>';
+  }
+  return '<div class="overlay" onclick="if(event.target===this)App.closeModal()"><div class="modal">'
+    + '<div class="modalhead"><h3>' + esc(action) + '（操作：' + esc(currentOp) + '）</h3><button class="xbtn" onclick="App.closeModal()">×</button></div>'
+    + '<input type="hidden" id="op_action" value="' + esc(action) + '">'
+    + body
+    + '<div class="field"><span class="flabel">メモ（任意）</span><input id="op_note" placeholder="例：〇〇実験用 / 発注分の受け取り"></div>'
+    + '<div class="modalfoot"><button class="btn ghost" onclick="App.closeModal()">キャンセル</button>'
+    + '<button class="btn ' + a.btn + '" id="op_submit" onclick="App.submitOp()">記録する</button></div>'
+    + "</div></div>";
+}
+function qtyField(label, def, max){
+  return '<div class="field"><span class="flabel">' + label + (max !== undefined ? "（最大 " + max + "）" : "") + '</span>'
+    + '<input type="number" id="q_main" min="1" step="1" value="' + def + '"' + (max !== undefined ? ' max="' + max + '"' : "") + ' oninput="App.updatePreview()"></div>';
+}
+
+function computeOp(){
+  const action = $("op_action").value;
+  let v = 0, p = 0, valid = true, desc = "";
+  if(action === "瓶入庫"){
+    const n = parseInt($("q_main").value) || 0;
+    v = n; valid = n >= 1;
+    desc = "瓶：" + vialCount + " → <b>" + (vialCount + n) + "本</b>";
+  }else if(action === "小分け"){
+    const n = parseInt($("q_main").value) || 0;
+    v = -n; p = n * SPLIT_RATIO;
+    valid = n >= 1 && n <= vialCount;
+    desc = "瓶：" + vialCount + " → <b>" + (vialCount - n) + "本</b><br>"
+         + "調製品：" + prepCount + " → <b>" + (prepCount + n * SPLIT_RATIO) + "本</b>（＋" + n * SPLIT_RATIO + "）";
+    if(n > vialCount) desc += '<br><span style="color:var(--danger)">瓶の在庫が足りません</span>';
+  }else if(action === "調製品出庫"){
+    const n = parseInt($("q_main").value) || 0;
+    p = -n; valid = n >= 1 && n <= prepCount;
+    desc = "調製品：" + prepCount + " → <b>" + (prepCount - n) + "本</b>";
+    if(n > prepCount) desc += '<br><span style="color:var(--danger)">調製品の在庫が足りません</span>';
+  }else{ // 棚卸修正
+    const tv = Math.max(0, parseInt($("q_vial").value) || 0);
+    const tp = Math.max(0, parseInt($("q_prep").value) || 0);
+    v = tv - vialCount; p = tp - prepCount;
+    valid = (v !== 0 || p !== 0);
+    desc = "瓶：" + vialCount + " → <b>" + tv + "本</b>（" + (v>=0?"＋":"") + v + "）<br>"
+         + "調製品：" + prepCount + " → <b>" + tp + "本</b>（" + (p>=0?"＋":"") + p + "）";
+    if(!valid) desc += "<br>変更がありません";
+  }
+  return { action, v, p, valid, desc };
+}
+
+// ---------- App API ----------
+const App = {
+  setOp(name){
+    currentOp = name;
+    localStorage.setItem("op-name", name);
+    render();
+  },
+  openOp(action){
+    if(!currentOp) return;
+    $("modalRoot").innerHTML = opModalHTML(action);
+    App.updatePreview();
+  },
+  updatePreview(){
+    const r = computeOp();
+    $("preview").innerHTML = r.desc;
+    $("op_submit").disabled = !r.valid;
+  },
+  closeModal(){ $("modalRoot").innerHTML = ""; },
+  async submitOp(){
+    const r = computeOp();
+    if(!r.valid) return;
+    $("op_submit").disabled = true;
+    $("op_submit").textContent = "記録中…";
+    const { error } = await sb.from("transactions").insert({
+      member_name: currentOp,
+      action: r.action,
+      vial_delta: r.v,
+      aliquot_delta: r.p,
+      note: $("op_note").value.trim(),
+    });
+    if(error){
+      alert("記録に失敗しました。通信環境を確認してもう一度お試しください。");
+      $("op_submit").disabled = false;
+      $("op_submit").textContent = "記録する";
+      return;
+    }
+    App.closeModal();
+    refresh();
+  },
+
+  // ---- メンバー管理 ----
+  openMembers(){
+    let rows = members.map(m =>
+      '<div class="memrow"><span>' + esc(m.name) + '</span>'
+      + '<button onclick="App.deleteMember(\'' + m.id + '\',\'' + esc(m.name).replace(/'/g,"\\'") + '\')">削除</button></div>'
+    ).join("");
+    if(!rows) rows = '<div class="empty" style="padding:16px 0;">メンバーがいません。下から追加してください。</div>';
+    $("modalRoot").innerHTML =
+      '<div class="overlay" onclick="if(event.target===this)App.closeModal()"><div class="modal">'
+      + '<div class="modalhead"><h3>メンバー管理</h3><button class="xbtn" onclick="App.closeModal()">×</button></div>'
+      + rows
+      + '<div class="addmem"><input id="newMember" placeholder="名前（例：田中）" onkeydown="if(event.key===\'Enter\')App.addMember()">'
+      + '<button class="btn c-in" onclick="App.addMember()">追加</button></div>'
+      + '<p style="font-size:11px;color:var(--sub);margin-top:12px;line-height:1.7;">メンバーを削除しても、過去の履歴に残った名前は消えません。</p>'
+      + "</div></div>";
+    $("newMember").focus();
+  },
+  async addMember(){
+    const name = $("newMember").value.trim();
+    if(!name) return;
+    const { error } = await sb.from("members").insert({ name });
+    if(error){
+      alert(error.code === "23505" ? "同じ名前のメンバーが既にいます。" : "追加に失敗しました。");
+      return;
+    }
+    await refresh();
+    App.openMembers();
+  },
+  async deleteMember(id, name){
+    if(!confirm("「" + name + "」をメンバーから削除しますか？（過去の履歴は残ります）")) return;
+    await sb.from("members").delete().eq("id", id);
+    if(currentOp === name){ currentOp = ""; localStorage.removeItem("op-name"); }
+    await refresh();
+    App.openMembers();
+  },
+
+  exportCSV(){
+    const rows = [["日時","操作者","操作","瓶の増減","調製品の増減","メモ"]];
+    [...txs].reverse().forEach(t => rows.push([
+      new Date(t.created_at).toLocaleString("ja-JP"),
+      t.member_name, t.action, t.vial_delta, t.aliquot_delta, t.note,
+    ]));
+    const csv = rows.map(r => r.map(v => '"' + String(v ?? "").replace(/"/g,'""') + '"').join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type:"text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "出庫入庫履歴_" + new Date().toISOString().slice(0,10) + ".csv";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  },
+};
+
+// ---------- 未設定時の案内 ----------
+function setupHTML(){
+  return '<div class="setup"><h2>初期設定が必要です</h2>'
+    + '<p>このアプリを動かすには、データの保存先（Supabase）の情報をファイルに書き込む必要があります。</p><ol>'
+    + '<li>Supabaseでプロジェクトを作成し、SQL Editorで <code>setup.sql</code> を実行する</li>'
+    + '<li>Supabaseの Settings → API で <code>Project URL</code> と <code>anon public</code> キーをコピーする</li>'
+    + '<li>この <code>index.html</code> をテキストエディタで開き、上部の <code>SUPABASE_URL</code> と <code>SUPABASE_ANON_KEY</code> の2行に貼り付けて保存する</li>'
+    + '<li>ファイルをGitHubにアップロードし直す</li></ol>'
+    + '<p>詳しい手順は、このアプリを作成したときの案内を参照してください。</p></div>';
+}
+
+init();
+</script>
+</body>
+</html>
