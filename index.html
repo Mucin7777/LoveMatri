@@ -34,6 +34,8 @@
   }
   .matori img{
     width:64px; height:64px; object-fit:contain; flex-shrink:0;
+    cursor:pointer; touch-action:manipulation;
+    -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent;
   }
   .matori .mfallback{
     width:64px; height:64px; flex-shrink:0;
@@ -218,6 +220,12 @@ const MATORI = [
     comments:["ふぁ〜あ…ねむくなってきた…", "今日もおつかれさま〜", "夜ふかしはほどほどにね〜", "そろそろおふとん恋しい…"] },
 ];
 
+// 7回連続でつつくと出てくるびっくりマトリちゃん（5秒でもどります）
+const MATORI_BIKKURI = {
+  img: "matori_bikkuri.png",
+  comments: ["わっ！！びっくりしたー！！", "ひゃあっ！？おどかさないでよ〜！", "うわわっ！つんつんしすぎ〜！", "きゃー！！なになに！？"],
+};
+
 // ============================================================
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -247,6 +255,7 @@ function configured(){
 
 // ---------- マトリちゃん ----------
 let matoriSlotIdx = -1;
+let pokeCount = 0, lastPoke = 0, surprised = false, surpriseTimer = null;
 
 function jstHour(){
   return parseInt(new Intl.DateTimeFormat("en-US", {
@@ -260,23 +269,39 @@ function matoriSlot(){
     const s = MATORI[i];
     const hit = s.start < s.end
       ? (h >= s.start && h < s.end)       // 例：5時〜11時
-      : (h >= s.start || h < s.end);      // 例：23時〜翌5時（日をまたぐ）
+      : (h >= s.start || h < s.end);      // 例：19時〜翌5時（日をまたぐ）
     if(hit) return i;
   }
   return 0;
 }
 
+function matoriHTML(img, name, comment){
+  return '<img src="' + esc(img) + '" alt="' + esc(name) + '" onclick="App.pokeMatori()"'
+    + ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
+    + '<span class="mfallback" style="display:none;" onclick="App.pokeMatori()">🌱</span>'
+    + '<div class="mbubble">' + esc(comment) + '</div>';
+}
+
 function renderMatori(force){
+  if(surprised) return;  // びっくり中は上書きしない
   const idx = matoriSlot();
   if(!force && idx === matoriSlotIdx) return;  // 時間帯が変わったときだけ更新
   matoriSlotIdx = idx;
   const s = MATORI[idx];
   const comment = s.comments[Math.floor(Math.random() * s.comments.length)];
-  $("matori").innerHTML =
-    '<img src="' + esc(s.img) + '" alt="' + esc(s.name) + '"'
-    + ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
-    + '<span class="mfallback" style="display:none;">🌱</span>'
-    + '<div class="mbubble">' + esc(comment) + '</div>';
+  $("matori").innerHTML = matoriHTML(s.img, s.name, comment);
+}
+
+function matoriSurprise(){
+  surprised = true;
+  pokeCount = 0;
+  const c = MATORI_BIKKURI.comments[Math.floor(Math.random() * MATORI_BIKKURI.comments.length)];
+  $("matori").innerHTML = matoriHTML(MATORI_BIKKURI.img, "マトリちゃん（びっくり）", c);
+  clearTimeout(surpriseTimer);
+  surpriseTimer = setTimeout(() => {
+    surprised = false;
+    renderMatori(true);  // 5秒後にいつもの姿へ
+  }, 5000);
 }
 
 // ---------- 初期化 ----------
@@ -466,6 +491,15 @@ function computeOp(){
 
 // ---------- App API ----------
 const App = {
+  pokeMatori(){
+    if(surprised) return;
+    const now = Date.now();
+    // 間が2秒以上あいたら数えなおし（「連続」判定）
+    if(now - lastPoke > 2000) pokeCount = 0;
+    lastPoke = now;
+    pokeCount++;
+    if(pokeCount >= 7) matoriSurprise();
+  },
   setOp(name){
     currentOp = name;
     localStorage.setItem("op-name", name);
