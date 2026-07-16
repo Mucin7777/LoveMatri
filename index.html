@@ -11,6 +11,7 @@
     --prep:#B9772E; --prep-soft:#F7ECDD;
     --danger:#B4443C; --danger-soft:#F6E3E1;
     --blue:#3A5F8A; --blue-soft:#E4EBF3;
+    --plum:#7A5C8F; --plum-soft:#EEE8F3;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   body{
@@ -26,6 +27,28 @@
   .dot{width:8px; height:8px; border-radius:99px; background:#C4CBC6; display:inline-block;}
   .dot.live{background:var(--base);}
   .dot.err{background:var(--danger);}
+
+  /* マトリちゃん */
+  .matori{
+    margin-top:12px; display:flex; align-items:center; gap:10px;
+  }
+  .matori img, .matori .mfallback{
+    width:44px; height:44px; border-radius:50%; object-fit:cover;
+    border:2px solid var(--line); background:var(--card); flex-shrink:0;
+  }
+  .matori .mfallback{
+    display:flex; align-items:center; justify-content:center; font-size:22px;
+  }
+  .matori .mbubble{
+    position:relative; background:var(--card); border:1px solid var(--line);
+    border-radius:12px; padding:8px 12px; font-size:12px; line-height:1.6; color:var(--ink);
+  }
+  .matori .mbubble::before{
+    content:""; position:absolute; left:-6px; top:50%; transform:translateY(-50%) rotate(45deg);
+    width:10px; height:10px; background:var(--card);
+    border-left:1px solid var(--line); border-bottom:1px solid var(--line);
+  }
+  .matori .mname{font-size:10px; color:var(--sub); display:block;}
 
   /* stock cards */
   .stocks{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;}
@@ -65,12 +88,20 @@
   .abtn.in{background:var(--base);}
   .abtn.split{background:var(--prep);}
   .abtn.out{background:var(--blue);}
+  .abtn.vout{background:var(--plum);}
   .abtn.adjust{background:var(--card); color:var(--ink); border:1px solid var(--line); font-weight:600;}
   .abtn:disabled{opacity:.4; cursor:default;}
 
   /* history */
   h2{font-size:15px; margin-top:28px; display:flex; justify-content:space-between; align-items:baseline;}
   h2 .minibtn{font-weight:400;}
+  .tabs{display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;}
+  .tab{
+    font-size:12px; padding:6px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line); background:var(--card); color:var(--sub); font-family:inherit;
+  }
+  .tab.on{background:var(--ink); color:#fff; border-color:var(--ink); font-weight:600;}
+  .tab .tcount{font-size:10px; opacity:.75; margin-left:3px; font-variant-numeric:tabular-nums;}
   .hist{margin-top:10px; display:flex; flex-direction:column; gap:8px;}
   .hrow{
     background:var(--card); border:1px solid var(--line); border-radius:10px;
@@ -80,6 +111,7 @@
   .hb-in{background:var(--base-soft); color:var(--base);}
   .hb-split{background:var(--prep-soft); color:var(--prep);}
   .hb-out{background:var(--blue-soft); color:var(--blue);}
+  .hb-vout{background:var(--plum-soft); color:var(--plum);}
   .hb-adjust{background:#EEF0EC; color:var(--sub);}
   .hwho{font-weight:600;}
   .hdelta{font-size:12px; color:var(--sub);}
@@ -121,7 +153,8 @@
   }
   .btn.ghost{background:var(--card); color:var(--ink); border:1px solid var(--line); font-weight:400;}
   .btn.c-in{background:var(--base);} .btn.c-split{background:var(--prep);}
-  .btn.c-out{background:var(--blue);} .btn.c-adjust{background:var(--ink);}
+  .btn.c-out{background:var(--blue);} .btn.c-vout{background:var(--plum);}
+  .btn.c-adjust{background:var(--ink);}
   .btn.danger{background:var(--danger);}
   .btn:disabled{opacity:.4; cursor:default;}
 
@@ -147,6 +180,7 @@
       <h1>出庫入庫管理</h1>
       <span id="connState"><span class="dot"></span>接続中…</span>
     </div>
+    <div class="matori" id="matori"></div>
   </header>
   <div id="app"></div>
 </div>
@@ -169,6 +203,23 @@ const VIAL_LABEL = "瓶（原液 10mL）";
 const PREP_LABEL = "調製品（小分け）";
 
 // ============================================================
+// ★ マトリちゃん設定
+//   画像ファイルを index.html と同じフォルダに置いて、
+//   下の img のファイル名を自分の画像の名前に書き換えてください。
+//   時間帯（日本時間）と、コメント（ランダムで1つ表示）も自由に編集できます。
+// ============================================================
+const MATORI = [
+  { name:"マトリちゃん（朝）",   start:5,  end:11, img:"matori_asa.png",
+    comments:["おはよう！今日もいい日だね", "ふぁ〜…まだちょっとねむい…", "朝ごはん、なに食べた？", "おはよ〜。今日は何しようかな〜"] },
+  { name:"マトリちゃん（昼）",   start:11, end:16, img:"matori_hiru.png",
+    comments:["やっほ〜！いい天気かな？", "おなかすいてきたね〜", "お昼ってなんか眠くなるよね〜", "こんにちは！今日も平和だね〜"] },
+  { name:"マトリちゃん（夕方）", start:16, end:19, img:"matori_yugata.png",
+    comments:["もう夕方かぁ、1日はやいね〜", "今日の晩ごはん、なんだろうね", "ちょっとつかれてきた…かも", "夕焼け、きれいかな〜"] },
+  { name:"マトリちゃん（夜）",   start:19, end:5,  img:"matori_yoru.png",
+    comments:["ふぁ〜あ…ねむくなってきた…", "今日もおつかれさま〜", "夜ふかしはほどほどにね〜", "そろそろおふとん恋しい…"] },
+];
+
+// ============================================================
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
@@ -176,22 +227,64 @@ const ACTIONS = {
   "瓶入庫":   { cls:"in",     btn:"c-in" },
   "小分け":   { cls:"split",  btn:"c-split" },
   "調製品出庫":{ cls:"out",    btn:"c-out" },
+  "瓶出庫":   { cls:"vout",   btn:"c-vout" },
   "棚卸修正": { cls:"adjust", btn:"c-adjust" },
 };
+
+// 履歴タブ（"all" = 全て、それ以外は ACTIONS のキー）
+const HIST_TABS = ["all", "瓶入庫", "小分け", "調製品出庫", "瓶出庫", "棚卸修正"];
 
 let sb = null;
 let members = [];
 let txs = [];          // 全履歴（新しい順）
 let vialCount = 0, prepCount = 0;
 let currentOp = localStorage.getItem("op-name") || "";
+let histFilter = "all";
 let pollTimer = null;
 
 function configured(){
   return SUPABASE_URL.startsWith("https://") && !SUPABASE_ANON_KEY.includes("貼り付け");
 }
 
+// ---------- マトリちゃん ----------
+let matoriSlotIdx = -1;
+
+function jstHour(){
+  return parseInt(new Intl.DateTimeFormat("en-US", {
+    hour:"numeric", hourCycle:"h23", timeZone:"Asia/Tokyo",
+  }).format(new Date()), 10);
+}
+
+function matoriSlot(){
+  const h = jstHour();
+  for(let i = 0; i < MATORI.length; i++){
+    const s = MATORI[i];
+    const hit = s.start < s.end
+      ? (h >= s.start && h < s.end)       // 例：5時〜11時
+      : (h >= s.start || h < s.end);      // 例：23時〜翌5時（日をまたぐ）
+    if(hit) return i;
+  }
+  return 0;
+}
+
+function renderMatori(force){
+  const idx = matoriSlot();
+  if(!force && idx === matoriSlotIdx) return;  // 時間帯が変わったときだけ更新
+  matoriSlotIdx = idx;
+  const s = MATORI[idx];
+  const comment = s.comments[Math.floor(Math.random() * s.comments.length)];
+  $("matori").innerHTML =
+    '<img src="' + esc(s.img) + '" alt="' + esc(s.name) + '"'
+    + ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
+    + '<span class="mfallback" style="display:none;">🌱</span>'
+    + '<div class="mbubble"><span class="mname">' + esc(s.name) + '</span>' + esc(comment) + '</div>';
+}
+
 // ---------- 初期化 ----------
 async function init(){
+  renderMatori(true);
+  setInterval(() => renderMatori(false), 60000);  // 1分ごとに時間帯をチェック
+
   if(!configured()){
     $("app").innerHTML = setupHTML();
     setConn("err", "未設定");
@@ -259,17 +352,28 @@ function render(){
   h += '<div class="actions">'
     + '<button class="abtn in" ' + (opOk?"":"disabled") + ' onclick="App.openOp(\'瓶入庫\')">瓶を入庫<small>＋N本</small></button>'
     + '<button class="abtn split" ' + (opOk && vialCount>0 ? "" : "disabled") + ' onclick="App.openOp(\'小分け\')">小分けする<small>瓶−1 → 調製品＋' + SPLIT_RATIO + '</small></button>'
+    + '<button class="abtn vout" ' + (opOk && vialCount>0 ? "" : "disabled") + ' onclick="App.openOp(\'瓶出庫\')">瓶を出庫<small>瓶のまま −N本</small></button>'
     + '<button class="abtn out" ' + (opOk && prepCount>0 ? "" : "disabled") + ' onclick="App.openOp(\'調製品出庫\')">調製品を出庫<small>−N本</small></button>'
     + '<button class="abtn adjust" ' + (opOk?"":"disabled") + ' onclick="App.openOp(\'棚卸修正\')">数を修正<small>棚卸し・訂正</small></button>'
     + '</div>';
 
-  // 履歴
-  h += '<h2>履歴（全' + txs.length + '件）<button class="minibtn" onclick="App.exportCSV()">📊 CSVで書き出し</button></h2>';
-  if(txs.length === 0){
-    h += '<div class="empty">まだ記録がありません。「瓶を入庫」から始めてください。</div>';
+  // 履歴（タブでしぼり込み）
+  const filtered = histFilter === "all" ? txs : txs.filter(t => t.action === histFilter);
+  h += '<h2>履歴<button class="minibtn" onclick="App.exportCSV()">📊 CSVで書き出し</button></h2>';
+  h += '<div class="tabs">' + HIST_TABS.map(tab => {
+    const count = tab === "all" ? txs.length : txs.filter(t => t.action === tab).length;
+    const label = tab === "all" ? "全て" : tab;
+    return '<button class="tab' + (histFilter === tab ? " on" : "") + '" onclick="App.setHistFilter(\'' + tab + '\')">'
+      + esc(label) + '<span class="tcount">' + count + '</span></button>';
+  }).join("") + '</div>';
+
+  if(filtered.length === 0){
+    h += '<div class="empty">' + (txs.length === 0
+      ? 'まだ記録がありません。「瓶を入庫」から始めてください。'
+      : 'この種類の記録はまだありません。') + '</div>';
   }else{
-    h += '<div class="hist">' + txs.slice(0, 100).map(histRow).join("") + "</div>";
-    if(txs.length > 100) h += '<div class="empty" style="padding:16px 0;">直近100件を表示中（全データはCSVで確認できます）</div>';
+    h += '<div class="hist">' + filtered.slice(0, 100).map(histRow).join("") + "</div>";
+    if(filtered.length > 100) h += '<div class="empty" style="padding:16px 0;">直近100件を表示中（全データはCSVで確認できます）</div>';
   }
   $("app").innerHTML = h;
 }
@@ -299,6 +403,9 @@ function opModalHTML(action){
       + '<div class="preview" id="preview"></div>';
   }else if(action === "小分け"){
     body = qtyField("小分けする瓶の本数", 1, vialCount)
+      + '<div class="preview" id="preview"></div>';
+  }else if(action === "瓶出庫"){
+    body = qtyField("出庫する瓶の本数", 1, vialCount)
       + '<div class="preview" id="preview"></div>';
   }else if(action === "調製品出庫"){
     body = qtyField("出庫する調製品の本数", 1, prepCount)
@@ -336,6 +443,11 @@ function computeOp(){
     desc = "瓶：" + vialCount + " → <b>" + (vialCount - n) + "本</b><br>"
          + "調製品：" + prepCount + " → <b>" + (prepCount + n * SPLIT_RATIO) + "本</b>（＋" + n * SPLIT_RATIO + "）";
     if(n > vialCount) desc += '<br><span style="color:var(--danger)">瓶の在庫が足りません</span>';
+  }else if(action === "瓶出庫"){
+    const n = parseInt($("q_main").value) || 0;
+    v = -n; valid = n >= 1 && n <= vialCount;
+    desc = "瓶：" + vialCount + " → <b>" + (vialCount - n) + "本</b>（調製品は作りません）";
+    if(n > vialCount) desc += '<br><span style="color:var(--danger)">瓶の在庫が足りません</span>';
   }else if(action === "調製品出庫"){
     const n = parseInt($("q_main").value) || 0;
     p = -n; valid = n >= 1 && n <= prepCount;
@@ -358,6 +470,10 @@ const App = {
   setOp(name){
     currentOp = name;
     localStorage.setItem("op-name", name);
+    render();
+  },
+  setHistFilter(tab){
+    histFilter = tab;
     render();
   },
   openOp(action){
