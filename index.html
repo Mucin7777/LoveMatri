@@ -32,12 +32,12 @@
   .matori{
     margin-top:12px; display:flex; align-items:center; gap:10px;
   }
-  .matori img, .matori .mfallback{
-    width:44px; height:44px; border-radius:50%; object-fit:cover;
-    border:2px solid var(--line); background:var(--card); flex-shrink:0;
+  .matori img{
+    width:64px; height:64px; object-fit:contain; flex-shrink:0;
   }
   .matori .mfallback{
-    display:flex; align-items:center; justify-content:center; font-size:22px;
+    width:64px; height:64px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:28px;
   }
   .matori .mbubble{
     position:relative; background:var(--card); border:1px solid var(--line);
@@ -48,7 +48,6 @@
     width:10px; height:10px; background:var(--card);
     border-left:1px solid var(--line); border-bottom:1px solid var(--line);
   }
-  .matori .mname{font-size:10px; color:var(--sub); display:block;}
 
   /* stock cards */
   .stocks{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px;}
@@ -277,7 +276,7 @@ function renderMatori(force){
     '<img src="' + esc(s.img) + '" alt="' + esc(s.name) + '"'
     + ' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
     + '<span class="mfallback" style="display:none;">🌱</span>'
-    + '<div class="mbubble"><span class="mname">' + esc(s.name) + '</span>' + esc(comment) + '</div>';
+    + '<div class="mbubble">' + esc(comment) + '</div>';
 }
 
 // ---------- 初期化 ----------
